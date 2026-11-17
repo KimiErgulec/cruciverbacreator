@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Creatore di Cruciverba</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f6f3ea;--fg:#1a1a1a;--card:#fff;--line:#222;--mut:#6b6b6b;--acc:#c0392b;--sel:#ffe9a8;--hl:#fff6d6}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1b1a17;--fg:#eee;--card:#262520;--line:#ddd;--mut:#999;--acc:#e67e6e;--sel:#6b5a1e;--hl:#3a3420}}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:Georgia,'Times New Roman',serif}
+.app{max-width:960px;margin:0 auto;padding:16px}
+h1{margin:0 0 4px;font-size:1.6rem}.sub{color:var(--mut);margin:0 0 14px;font-size:.9rem}
+.bar{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-bottom:12px;font-family:system-ui,sans-serif;font-size:.9rem}
+.bar label{display:flex;align-items:center;gap:6px}
+input[type=number]{width:60px}input,button{font:inherit}
+button{background:var(--fg);color:var(--bg);border:0;border-radius:6px;padding:6px 12px;cursor:pointer}
+button.alt{background:transparent;color:var(--fg);border:1px solid var(--line)}
+button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.wrap{overflow-x:auto;padding:4px 0 10px}
+#grid{display:grid;border:3px solid var(--line);width:max-content;margin:0 auto;background:var(--card);outline:none;user-select:none;touch-action:none}
+.c{position:relative;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:Arial,sans-serif;font-weight:600}
+.c.b{background:#000}.c.hl{background:var(--hl)}.c.s{background:var(--sel)}
+.c i{position:absolute;top:1px;left:2px;font-style:normal;font-weight:400;font-size:.32em;line-height:1;color:var(--fg)}
+.c.b i{display:none}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;font-family:system-ui,sans-serif}
+@media(max-width:640px){.cols{grid-template-columns:1fr}}
+.cols h3{margin:6px 0;border-bottom:2px solid var(--line);font-family:Georgia,serif}
+.cl{display:flex;gap:6px;align-items:center;margin:3px 0}
+.cl b{min-width:26px;text-align:right}.cl input{flex:1;min-width:0;padding:4px 6px;border:1px solid var(--line);border-radius:4px;background:var(--card);color:var(--fg)}.cl small{color:var(--mut)}
+.hint{color:var(--mut);font-size:.82rem;font-family:system-ui,sans-serif;margin:6px 0 14px}
+#printArea{display:none}
+@media print{.app{display:none!important}#printArea{display:block!important;padding:0;color:#000;background:#fff}#printArea img{display:block;margin:0 auto 14px;max-width:100%}#printArea .pc{columns:2;column-gap:24px;font:12px/1.4 Arial,sans-serif}#printArea h3{margin:0 0 4px;font-size:13px}#printArea h2{text-align:center;margin:0 0 10px;font-family:Georgia,serif}#printArea .blk{break-inside:avoid;margin-bottom:10px}:root{background:#fff;padding:0}body{background:#fff}}
+</style>
+</head>
+<body>
+<div class="app">
+<h1>Creatore di Cruciverba</h1>
+<p class="sub">Schema in stile Settimana Enigmistica: numeri automatici, definizioni, esportazione e stampa.</p>
+<div class="bar">
+<label>Larghezza <input id="w" type="number" min="3" max="30" value="13"></label>
+<label>Altezza <input id="h" type="number" min="3" max="30" value="13"></label>
+<button id="mk">Applica misure</button>
+<button class="alt" id="clr">Svuota tutto</button>
+</div>
+<div class="bar">
+<button id="mW" class="on">✏️ Scrivi lettere</button>
+<button id="mB" class="alt">⬛ Colora caselle nere</button>
+<label><input type="checkbox" id="sym"> Simmetria 180°</label>
+</div>
+<div class="wrap"><div id="grid" tabindex="0"></div></div>
+<p class="hint">Scrivi: clicca una casella e digita (frecce per muoversi, clic ripetuto cambia direzione, Backspace cancella, il tasto “.” annerisce/schiarisce). Caselle nere: clicca o trascina. I numeri compaiono da soli.</p>
+<div class="cols"><div><h3>Orizzontali</h3><div id="cA"></div></div><div><h3>Verticali</h3><div id="cD"></div></div></div>
+<div class="bar" style="margin-top:16px">
+<label>Titolo <input id="title" type="text" placeholder="(facoltativo)" style="width:170px"></label>
+<label><input type="checkbox" id="sol"> Mostra lettere (soluzione)</label>
+<button id="png">⬇ Scarica immagine PNG</button>
+<button id="p1" class="alt">🖨 Stampa solo schema</button>
+<button id="p2" class="alt">🖨 Stampa schema + definizioni</button>
+</div>
+</div>
+<div id="printArea"></div>
+<script>
+const $=s=>document.querySelector(s);
+let W=13,H=13,cells=[],clues={},els=[],sel=null,dir='A',mode='W',paint=null,info=null;
+function resize(w,h){const n=[];for(let r=0;r<h;r++){n[r]=[];for(let c=0;c<w;c++)n[r][c]=(cells[r]&&cells[r][c])||{b:0,l:''}}cells=n;W=w;H=h;if(sel&&(sel.r>=H||sel.c>=W))sel=null;build()}
+function number(){let n=0;const nums={},A=[],D=[];
+for(let r=0;r<H;r++)for(let c=0;c<W;c++){if(cells[r][c].b)continue;
+const sa=(c==0||cells[r][c-1].b)&&c+1<W&&!cells[r][c+1].b,sd=(r==0||cells[r-1][c].b)&&r+1<H&&!cells[r+1][c].b;
+if(!sa&&!sd)continue;n++;nums[r+','+c]=n;
+if(sa){let l=0;while(c+l<W&&!cells[r][c+l].b)l++;A.push({n,r,c,l})}
+if(sd){let l=0;while(r+l<H&&!cells[r+l][c].b)l++;D.push({n,r,c,l})}}
+return{nums,A,D}}
+function build(){const g=$('#grid');const cs=Math.max(20,Math.min(46,Math.floor((Math.min(innerWidth,920)-44)/W)));
+g.style.gridTemplateColumns=`repeat(${W},${cs}px)`;g.style.gridAutoRows=cs+'px';g.style.fontSize=cs*.58+'px';g.innerHTML='';els=[];
+for(let r=0;r<H;r++){els[r]=[];for(let c=0;c<W;c++){const d=document.createElement('div');d.className='c';d.dataset.r=r;d.dataset.c=c;g.appendChild(d);els[r][c]=d}}
+refresh();buildClues()}
+function refresh(){info=number();
+for(let r=0;r<H;r++)for(let c=0;c<W;c++){const x=cells[r][c],e=els[r][c];
+e.className='c'+(x.b?' b':'')+(sel&&sel.r==r&&sel.c==c?' s':(inWord(r,c)?' hl':''));
+const n=info.nums[r+','+c];e.innerHTML=(n?'<i>'+n+'</i>':'')+(x.b?'':esc(x.l))}}
+function inWord(r,c){if(!sel||cells[sel.r][sel.c].b||cells[r][c].b)return false;
+if(dir=='A'){if(r!=sel.r)return false;const a=Math.min(c,sel.c),z=Math.max(c,sel.c);for(let i=a;i<=z;i++)if(cells[r][i].b)return false;return true}
+if(c!=sel.c)return false;const a=Math.min(r,sel.r),z=Math.max(r,sel.r);for(let i=a;i<=z;i++)if(cells[i][c].b)return false;return true}
+const esc=s=>s.replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+function buildClues(){for(const [k,id] of [['A','#cA'],['D','#cD']]){const box=$(id);box.innerHTML='';
+if(!info[k].length)box.innerHTML='<small style="color:var(--mut)">Nessuna parola ancora.</small>';
+info[k].forEach(w=>{const key=w.r+','+w.c+','+k,d=document.createElement('div');d.className='cl';
+d.innerHTML=`<b>${w.n}</b><input placeholder="Definizione…" maxlength="160"><small>(${w.l})</small>`;
+const i=d.querySelector('input');i.value=clues[key]||'';i.oninput=()=>clues[key]=i.value;box.appendChild(d)})}}
+function setBlack(r,c,v){const f=(a,b)=>{cells[a][b].b=v?1:0;if(v)cells[a][b].l=''};f(r,c);
+if($('#sym').checked)f(H-1-r,W-1-c)}
+function structural(){if(sel&&cells[sel.r][sel.c].b)sel=null;refresh();buildClues()}
+const g=$('#grid');
+g.addEventListener('pointerdown',e=>{const t=e.target.closest('.c');if(!t)return;const r=+t.dataset.r,c=+t.dataset.c;
+if(mode=='B'){paint=!cells[r][c].b;setBlack(r,c,paint);structural()}
+else{if(sel&&sel.r==r&&sel.c==c)dir=dir=='A'?'D':'A';sel={r,c};if(cells[r][c].b){setBlack(r,c,0);structural()}else refresh();g.focus()}
+e.preventDefault()});
+g.addEventListener('pointerover',e=>{if(mode!='B'||paint===null||!(e.buttons&1))return;const t=e.target.closest('.c');if(!t)return;
+const r=+t.dataset.r,c=+t.dataset.c;if(cells[r][c].b!=paint){setBlack(r,c,paint);structural()}});
+addEventListener('pointerup',()=>paint=null);
+function step(dr,dc){if(!sel)return;let r=sel.r+dr,c=sel.c+dc;if(r<0||c<0||r>=H||c>=W)return;sel={r,c};refresh()}
+g.addEventListener('keydown',e=>{if(!sel)return;const k=e.key;
+const ar={ArrowUp:[-1,0],ArrowDown:[1,0],ArrowLeft:[0,-1],ArrowRight:[0,1]};
+if(ar[k]){step(...ar[k]);e.preventDefault();return}
+if(k=='.'){const c=cells[sel.r][sel.c];setBlack(sel.r,sel.c,!c.b);structural();e.preventDefault();return}
+const x=cells[sel.r][sel.c];if(x.b)return;
+if(k=='Backspace'||k=='Delete'){if(x.l){x.l=''}else if(k=='Backspace'){dir=='A'?step(0,-1):step(-1,0);const y=cells[sel.r][sel.c];if(!y.b)y.l=''}refresh();e.preventDefault();return}
+if(k==' '||k=='Tab'&&false){dir=dir=='A'?'D':'A';refresh();e.preventDefault();return}
+if(/^[a-zA-ZÀ-ÿ]$/.test(k)){x.l=k.toUpperCase();dir=='A'?step(0,1):step(1,0);refresh();e.preventDefault()}});
+$('#mW').onclick=()=>setMode('W');$('#mB').onclick=()=>setMode('B');
+function setMode(m){mode=m;$('#mW').className=m=='W'?'on':'alt';$('#mB').className=m=='B'?'on':'alt'}
+$('#mk').onclick=()=>{const w=Math.max(3,Math.min(30,+$('#w').value||13)),h=Math.max(3,Math.min(30,+$('#h').value||13));$('#w').value=w;$('#h').value=h;resize(w,h)};
+$('#clr').onclick=()=>{if(confirm('Cancellare lettere, caselle nere e definizioni?')){cells=[];clues={};sel=null;resize(W,H)}};
+function draw(letters){const cs=80,m=5,cv=document.createElement('canvas');cv.width=W*cs+2*m;cv.height=H*cs+2*m;const x=cv.getContext('2d');
+x.fillStyle='#fff';x.fillRect(0,0,cv.width,cv.height);x.lineWidth=2;x.strokeStyle='#000';
+for(let r=0;r<H;r++)for(let c=0;c<W;c++){const X=m+c*cs,Y=m+r*cs,q=cells[r][c];
+if(q.b){x.fillStyle='#000';x.fillRect(X,Y,cs,cs);continue}
+x.strokeRect(X,Y,cs,cs);const n=info.nums[r+','+c];
+if(n){x.fillStyle='#000';x.font='400 22px Arial';x.textAlign='left';x.textBaseline='top';x.fillText(n,X+5,Y+4)}
+if(letters&&q.l){x.fillStyle='#000';x.font='600 46px Arial';x.textAlign='center';x.textBaseline='middle';x.fillText(q.l,X+cs/2,Y+cs/2+6)}}
+x.lineWidth=6;x.strokeRect(m,m,W*cs,H*cs);return cv}
+$('#png').onclick=()=>{const a=document.createElement('a');a.href=draw($('#sol').checked).toDataURL('image/png');a.download='cruciverba.png';a.click()};
+function cluesHTML(){const f=k=>info[k].map(w=>`<div><b>${w.n}</b> ${esc(clues[w.r+','+w.c+','+k]||'')} <span>(${w.l})</span></div>`).join('');
+return`<div class="pc"><div class="blk"><h3>ORIZZONTALI</h3>${f('A')}</div><div class="blk"><h3>VERTICALI</h3>${f('D')}</div></div>`}
+function doPrint(withClues){const t=esc($('#title').value);
+$('#printArea').innerHTML=(t?`<h2>${t}</h2>`:'')+`<img src="${draw($('#sol').checked).toDataURL()}">`+(withClues?cluesHTML():'');
+setTimeout(()=>print(),150)}
+$('#p1').onclick=()=>doPrint(false);$('#p2').onclick=()=>doPrint(true);
+let t;addEventListener('resize',()=>{clearTimeout(t);t=setTimeout(build,150)});
+resize(13,13);
+</script>
+</body>
+</html>
